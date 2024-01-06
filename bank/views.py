@@ -1,97 +1,87 @@
 # views.py
-from django.shortcuts import get_object_or_404
-from rest_framework.views import APIView
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import generics, permissions, status
-from .model import FacultyCriteria, Course, Faculty, FacultyCriteria
-from .serializers import FacultyCriteriaSerializer, CourseSerializer, LegislatorSerializer,FacultyCriteriaSerializer
-from .permissions import IsLegislator
-from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import AllowAny
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
+from .model import Legislator, FacultyCriteria, MajorCriteria, CourseCriteria
+from .serializers import (
+    LegislatorSerializer,
+    FacultyCriteriaSerializer,
+    MajorCriteriaSerializer,
+    CourseCriteriaSerializer,
+)
+from .permissions import IsLegislator
 
-class LegislatorCreateAPIView(APIView):
-    permission_classes = [AllowAny]
-    
-    def post(self, request, *args, **kwargs):
+class LegislatorViewSet(viewsets.ViewSet):
+    """
+    A viewset that provides actions for Legislator to register, login,
+    and manage criteria for faculty, major, and course.
+    """
+
+    permission_classes_by_action = {
+        'create': [permissions.AllowAny],
+        'add_faculty_criteria': [IsLegislator],
+        'add_major_criteria': [IsLegislator],
+        'add_course_criteria': [IsLegislator],
+        # Add other actions if necessary
+    }
+
+    def create(self, request):
+        """
+        Register a new legislator and return a token for authentication.
+        """
         serializer = LegislatorSerializer(data=request.data)
         if serializer.is_valid():
             legislator = serializer.save()
-            user = authenticate(username=legislator.user.username, password=request.data['password'])
             token, created = Token.objects.get_or_create(user=legislator.user)
-            return Response({"message": "Legislator successfully registered", "token": token.key}, status=201)
-        return Response(serializer.errors, status=400)
+            return Response({
+                "message": "Legislator successfully registered",
+                "token": token.key
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-    
-class FacultyCriteriaCreateView(generics.CreateAPIView):
-    queryset = FacultyCriteria.objects.all()
-    serializer_class = FacultyCriteriaSerializer
-    permission_classes = [IsLegislator]
-
-class CourseCreateView(generics.CreateAPIView):
-    queryset = Course.objects.all()
-    serializer_class = CourseSerializer
-
-    def perform_create(self, serializer):
-        # Extract faculty name from the request data
-        faculty_name = serializer.validated_data.get('faculty_name', None)
-
-        if faculty_name:
-            # Attempt to retrieve the corresponding Faculty object
-            faculty = Faculty.objects.filter(name_en=faculty_name).first()
-            if not faculty:
-                # If faculty with the provided name does not exist, raise an error
-                raise ValidationError({"faculty_name": "Faculty name is invalid or does not exist."})
-            serializer.save(faculty=faculty)
-        else:
-            # If faculty_name is not provided, raise an error
-            raise ValidationError({"faculty_name": "Faculty name is required."})
-
-    def create(self, request, *args, **kwargs):
-        # Handle bulk course creation
-        if isinstance(request.data, list):
-            courses_data = request.data
-            responses = []
-            for course_data in courses_data:
-                serializer = self.get_serializer(data=course_data)
-                serializer.is_valid(raise_exception=True)
-                self.perform_create(serializer)
-                responses.append(serializer.data)
-            return Response(responses, status=status.HTTP_201_CREATED)
-        else:
-            # Handle single course creation
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
+    @action(detail=False, methods=['post'], url_path='add-faculty-criteria')
+    def add_faculty_criteria(self, request):
+        """
+        Add new faculty criteria linked to the legislator.
+        """
+        serializer = FacultyCriteriaSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(legislator=request.user.legislator)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['post'], url_path='add-major-criteria')
+    def add_major_criteria(self, request):
+        """
+        Add new major criteria linked to the legislator.
+        """
+        serializer = MajorCriteriaSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(legislator=request.user.legislator)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class CourseDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Course.objects.all()
-    serializer_class = CourseSerializer
-    permission_classes = [permissions.IsAuthenticated, IsLegislator]
+    @action(detail=False, methods=['post'], url_path='add-course-criteria')
+    def add_course_criteria(self, request):
+        """
+        Add new course criteria linked to the legislator.
+        """
+        serializer = CourseCriteriaSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(legislator=request.user.legislator)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-
-class AddFacultyCriteriaAPIView(generics.CreateAPIView):
-    serializer_class = FacultyCriteriaSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def perform_create(self, serializer):
-        serializer.save(legislator=self.request.user)
-
-# Similar views for Major Criteria and Course Criteria
-
-class DeleteFacultyCriteriaAPIView(generics.DestroyAPIView):
-    queryset = FacultyCriteria.objects.all()
-    serializer_class = FacultyCriteriaSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        legislator = self.request.user
-        return FacultyCriteria.objects.filter(legislator=legislator)
-
-# Similar views for updating and deleting Major Criteria and Course Criteria
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        try:
+            # return permission_classes depending on `action`
+            return [permission() for permission in self.permission_classes_by_action[self.action]]
+        except KeyError:
+            # action is not set return default permission_classes
+            return [permission() for permission in self.permission_classes]
 
