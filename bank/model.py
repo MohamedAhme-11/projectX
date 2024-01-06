@@ -44,14 +44,12 @@ class Legislator(models.Model):
     website = models.URLField(default="http://example.com")  # Provide a generic placeholder or relevant default URL
     country = models.CharField(max_length=100, default="Default Country")  # Provide a default country name
     governorate = models.CharField(max_length=100, default="Default Governorate")  # Provide a default governorate name
-    
-    # ... remaining fields ...
     city = models.CharField(max_length=100, default='Default City')
     phone = models.CharField(max_length=50, default="+01")  # Provide a default phone number or consider making it nullable
     landline = models.CharField(max_length=50, default="+02")  # Provide a default landline number or consider making it nullable
     show_on_qodourat = models.BooleanField(default=True)  # Set the default for showing on Qodourat as True or False depending on your needs
     
-    # ... remaining fields ...
+   
 
 # Holds detailed descriptive and documentary information about various criteria.
 class CriteriaDetail(models.Model):
@@ -97,7 +95,8 @@ class Institution(models.Model):
     selected_courses_taught = models.ManyToManyField('Course', related_name='institutions_taught')  # Renamed field
     selected_faculty_criteria = models.ManyToManyField(FacultyCriteria, related_name='institutions')
     selected_major_criteria = models.ManyToManyField(MajorCriteria, related_name='institutions')
-    selected_course_criteria = models.ManyToManyField(CourseCriteria, related_name='institutions', blank=True)
+    selected_course_criteria = models.ManyToManyField('CourseCriteria', related_name='institutions', blank=True)
+
     institution_selected_courses = models.ManyToManyField('Course', related_name='selected_institutions')
 
     # Rest of the model fields...
@@ -132,11 +131,6 @@ class Major(models.Model):
 
 
 # Contains the intended learning outcomes for each major.
-class CourseCriteria(models.Model):
-    name_en = models.CharField(max_length=255)
-    name_ar = models.CharField(max_length=255, default='نص عربي')
-    legislator = models.ForeignKey(Legislator, related_name='course_criteria', on_delete=models.CASCADE)
-    detail = models.OneToOneField(CriteriaDetail, on_delete=models.CASCADE, null=True)  # Links to CriteriaDetail for detailed description and documentation
 
 
 # Defines a course within a major, including its name and related major
