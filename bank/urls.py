@@ -1,36 +1,18 @@
-"""
-URL configuration for bank project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
+# urls.py
 from django.contrib import admin
-from django.urls import path
-from bank.views import LegislatorCreateAPIView  # Ensure this path is correct
-from .views import FacultyCriteriaCreateView, CourseCreateView, CourseDetailUpdateDeleteView 
-from rest_framework.authtoken.views import obtain_auth_token  
-from django.contrib.auth.views import LoginView
-from django.contrib.auth.views import LogoutView
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter  
+from .views import LegislatorViewSet, FacultyCriteriaViewSet, MajorCriteriaViewSet, CourseCriteriaViewSet  # Update the import according to your app's structure
+
+# Creating a router and registering our viewsets with it.
+router = DefaultRouter()
+router.register(r'legislators', LegislatorViewSet)
+router.register(r'faculty-criteria', FacultyCriteriaViewSet)
+router.register(r'major-criteria', MajorCriteriaViewSet)
+router.register(r'course-criteria', CourseCriteriaViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('legislator/register/', LegislatorCreateAPIView.as_view(), name='legislator-register'),
-    path('faculty-criteria/', FacultyCriteriaCreateView.as_view(), name='faculty-criteria-create'),
-    path('faculty/<str:faculty_name>/add-course/', CourseCreateView.as_view(), name='add-course'),
-    path('course/<int:pk>/', CourseDetailUpdateDeleteView.as_view(), name='course-detail-update-delete'),
-    path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
-    path('legislator/login/', LoginView.as_view(), name='legislator-login'),
-    path('legislator/logout/', LogoutView.as_view(), name='legislator-logout'),
+    path('', include(router.urls)),
+    
 ]
-# urls.py
-
