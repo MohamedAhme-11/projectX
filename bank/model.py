@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-
-
+from cities.models import City
+from django.utils.text import slugify
+import uuid
 
 class CustomUser(AbstractUser):
     institution = models.ForeignKey('Institution', on_delete=models.SET_NULL, null=True)
@@ -36,19 +37,24 @@ class Legislator(models.Model):
     # models.py
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, null=True)
     name_en = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True, blank=True)
     name_ar = models.CharField(max_length=255, default='نص عربي')
     email = models.EmailField(max_length=254)
     location_branch_name_en = models.CharField(max_length=255, default="Default Branch Name")
     location_branch_name_ar = models.CharField(max_length=255, default="اسم الفرع الافتراضي")
     primary_contact_name = models.CharField(max_length=255, default="Default Contact Name")
     website = models.URLField(default="http://example.com")  # Provide a generic placeholder or relevant default URL
-    country = models.CharField(max_length=100, default="Default Country")  # Provide a default country name
-    governorate = models.CharField(max_length=100, default="Default Governorate")  # Provide a default governorate name
-    city = models.CharField(max_length=100, default='Default City')
+    country = models.CharField(max_length=100, blank=True)  # or link to a Country model
+    city = models.ForeignKey(City, on_delete=models.SET_NULL, null=True, related_name='legislators')
     phone = models.CharField(max_length=50, default="+01")  # Provide a default phone number or consider making it nullable
     landline = models.CharField(max_length=50, default="+02")  # Provide a default landline number or consider making it nullable
     show_on_qodourat = models.BooleanField(default=True)  # Set the default for showing on Qodourat as True or False depending on your needs
-    
+    def save(self, *args, **kwargs):
+        if not self.slug:  # If a slug hasn't been set yet
+            self.slug = slugify(self.name_en)
+            while Legislator.objects.filter(slug=self.slug).exists():
+                self.slug = slugify(self.name_en) + '-' + str(uuid.uuid4())[:8]
+        super(Legislator, self).save(*args, **kwargs)
    
 
 # Holds detailed descriptive and documentary information about various criteria.
@@ -91,7 +97,7 @@ class Institution(models.Model):
     account_type = models.ForeignKey('AccountType', on_delete=models.CASCADE)
     institution_type = models.ForeignKey('InstitutionType', on_delete=models.CASCADE)
     accreditation_status = models.ForeignKey('AccreditationStatus', on_delete=models.CASCADE)
-    city = models.ForeignKey('City', on_delete=models.CASCADE)
+    city = models.ForeignKey(City, on_delete=models.SET_NULL, null=True, related_name='institutions')
     selected_courses_taught = models.ManyToManyField('Course', related_name='institutions_taught')  # Renamed field
     selected_faculty_criteria = models.ManyToManyField(FacultyCriteria, related_name='institutions')
     selected_major_criteria = models.ManyToManyField(MajorCriteria, related_name='institutions')
@@ -146,15 +152,7 @@ class Course(models.Model):
 
 
 # Represents a governorate or similar administrative region for location categorization.
-class Governorate(models.Model):
-    name_en = models.CharField(max_length=255, null=False)
-    name_ar = models.CharField(max_length=255, default='نص عربي')
 
-# Defines cities within governorates for further location specificity.
-class City(models.Model):
-    governorate = models.ForeignKey(Governorate, on_delete=models.CASCADE, related_name='cities')
-    name_en = models.CharField(max_length=255, null=False)
-    name_ar = models.CharField(max_length=255, default='نص عربي')
 
 # Categorizes institutions, perhaps by their focus or funding nature.
 class InstituteCategory(models.Model):
